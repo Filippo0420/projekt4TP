@@ -31,3 +31,11 @@ if(TARGET SDL2::SDL2main)
 endif()
 target_link_libraries(planar_quadrotor SDL2::SDL2 SDL2_gfx Eigen matplot)
 target_include_directories(planar_quadrotor PRIVATE ${PROJECT_SOURCE_DIR})
+
+if (WIN32)
+    add_custom_command(
+        TARGET planar_quadrotor POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:SDL2::SDL2>" "$<TARGET_FILE_DIR:planar_quadrotor>"
+        VERBATIM
+    )
+endif()
