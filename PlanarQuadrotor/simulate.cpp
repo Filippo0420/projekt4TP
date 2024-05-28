@@ -2,6 +2,7 @@
  * SDL window creation adapted from https://github.com/isJuhn/DoublePendulum
 */
 #include "simulate.h"
+#include <matplot/matplot.h>
 
 Eigen::MatrixXf LQR(PlanarQuadrotor &quadrotor, float dt) {
     /* Calculate LQR gain matrix */
@@ -53,7 +54,7 @@ int main(int argc, char* args[])
      * For implemented LQR controller, it has to be [x, y, 0, 0, 0, 0]
     */
     Eigen::VectorXf goal_state = Eigen::VectorXf::Zero(6);
-    goal_state << -1, 7, 0, 0, 0, 0;
+    goal_state << 0, 0, 0, 0, 0, 0;
     quadrotor.SetGoal(goal_state);
     /* Timestep for the simulation */
     const float dt = 0.001;
@@ -71,14 +72,26 @@ int main(int argc, char* args[])
 
     if (init(gWindow, gRenderer, SCREEN_WIDTH, SCREEN_HEIGHT) >= 0)
     {
+        time_t start_time = time(0);
         SDL_Event e;
         bool quit = false;
         float delay;
-        int x, y;
+        int x, y, t;
         Eigen::VectorXf state = Eigen::VectorXf::Zero(6);
+        Eigen::VectorXf stateHistory = Eigen::VectorXf::Zero(6);
+        int time_stops = 1;
 
         while (!quit)
         {
+            stateHistory = quadrotor.GetState();
+            
+            if (difftime(time(0), start_time) >= time_stops) {
+                x_history.push_back(stateHistory[0]);
+                y_history.push_back(stateHistory[1]);
+                theta_history.push_back(stateHistory[2]);
+                time_stops += 1;
+            }
+
             //events
             while (SDL_PollEvent(&e) != 0)
             {
@@ -90,6 +103,35 @@ int main(int argc, char* args[])
                 {
                     SDL_GetMouseState(&x, &y);
                     std::cout << "Mouse position: (" << x << ", " << y << ")" << std::endl;
+                }
+                else if (e.type == SDL_MOUSEBUTTONDOWN)
+                {
+                    SDL_GetMouseState(&x, &y);
+                    state << x - SCREEN_WIDTH/2, y - SCREEN_HEIGHT/2, 0, 0, 0, 0;
+                    quadrotor.SetGoal(state);
+                }
+                else if (e.type == SDL_KEYUP) {
+                    if (e.key.keysym.sym == SDLK_p) {
+                        std::vector<double> historyTime = matplot::linspace(0, time_stops);
+
+                        matplot::tiledlayout(3, 1);
+                        auto ax1 = matplot::nexttile();
+                        auto p1 = matplot::plot(ax1, historyTime, x_history, "-o");
+                        matplot::xlabel(ax1, "time");
+                        matplot::ylabel(ax1, "x");
+
+                        auto ax2 = matplot::nexttile();
+                        auto p2 = matplot::plot(ax2, historyTime, y_history, "--xr");
+                        matplot::xlabel(ax2, "time");
+                        matplot::ylabel(ax2, "y");
+
+                        auto ax3 = matplot::nexttile();
+                        auto p3 = matplot::plot(ax3, historyTime, theta_history, "-:gr");
+                        matplot::xlabel(ax3, "time");
+                        matplot::ylabel(ax3, "theta");
+
+                        matplot::show();
+                    }
                 }
                 
             }
