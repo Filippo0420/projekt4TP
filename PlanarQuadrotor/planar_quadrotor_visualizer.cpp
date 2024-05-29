@@ -9,32 +9,44 @@ PlanarQuadrotorVisualizer::PlanarQuadrotorVisualizer(PlanarQuadrotor *quadrotor_
  * 3. Animate proppelers (extra points)
  */
 
-void drawEllipse(SDL_Renderer* renderer, int x0, int y0, int width, int height) {
-    int a = width / 2;
-    int b = height / 2;
-    int centerX = x0 + a;
-    int centerY = y0 + b;
-    int dx = 0;
-    int dy = b;
-    long a2 = a * a;
-    long b2 = b * b;
-    long err = b2 - (2 * b - 1) * a2, e2; /* error of 1.step */
-
-    do {
-        SDL_RenderDrawPoint(renderer, centerX + dx, centerY + dy);
-        SDL_RenderDrawPoint(renderer, centerX - dx, centerY + dy);
-        SDL_RenderDrawPoint(renderer, centerX - dx, centerY - dy);
-        SDL_RenderDrawPoint(renderer, centerX + dx, centerY - dy);
-
-        e2 = 2 * err;
-        if (e2 < (2 * dx + 1) * b2) { err += (2 * dx + 1) * b2; ++dx; }
-        if (e2 > -(2 * dy - 1) * a2) { err -= (2 * dy - 1) * a2; --dy; }
-    } while (dy >= 0);
-
-    while (dx++ < a) {
-        SDL_RenderDrawPoint(renderer, centerX + dx, centerY);
-        SDL_RenderDrawPoint(renderer, centerX - dx, centerY);
+void drawFilledEllipse(SDL_Renderer* renderer, int centerX, int centerY, int radiusX, int radiusY) {
+    for (int y = -radiusY; y <= radiusY; y++) {
+        for (int x = -radiusX; x <= radiusX; x++) {
+            if ((x * x * radiusY * radiusY + y * y * radiusX * radiusX) <= (radiusX * radiusX * radiusY * radiusY)) {
+                SDL_RenderDrawPoint(renderer, centerX + x, centerY + y);
+            }
+        }
     }
+}
+
+// Function to draw and fill a rotated rectangle with an additional shape (ellipse) inside
+void drawRotatedRect(SDL_Renderer* renderer, int x, int y, int w, int h, double angle) {
+    // Create a texture to represent the rectangle
+    SDL_Texture* rectTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
+
+    // Set the texture as the rendering target
+    SDL_SetRenderTarget(renderer, rectTexture);
+
+    // Fill the texture with red color for the rectangle
+    SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
+    SDL_Rect fillRect = { 0, 0, w, h };
+    SDL_RenderFillRect(renderer, &fillRect);
+
+    // Draw a filled blue ellipse inside the rectangle
+    SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0xFF, 0xFF);
+    drawFilledEllipse(renderer, x - w/2, y - h/2, w/4, h/4);
+
+    // Reset the rendering target to the default
+    SDL_SetRenderTarget(renderer, NULL);
+
+    // Define the destination rectangle on the screen
+    SDL_Rect destRect = { x, y, w, h};
+
+    // Copy the texture to the renderer with rotation
+    SDL_RenderCopyEx(renderer, rectTexture, NULL, &destRect, angle, NULL, SDL_FLIP_NONE);
+
+    // Destroy the texture
+    SDL_DestroyTexture(rectTexture);
 }
 
 void PlanarQuadrotorVisualizer::render(std::shared_ptr<SDL_Renderer> &gRenderer) {
@@ -48,24 +60,45 @@ void PlanarQuadrotorVisualizer::render(std::shared_ptr<SDL_Renderer> &gRenderer)
     q_theta = state[2];
 
     SDL_Rect rect;
-    rect.w = 50;
-    rect.h = 10;
-    rect.x = q_x - rect.w/2;
-    rect.y = q_y - rect.h/2;
 
-    int propWidth = 30;
-    int propHeight = 10;
+    int rectW = 50;
+    int rectH = 10;
+    int rectX = q_x - rectW/2;
+    int rectY = q_y - rectH/2;
+
+    rect.w = rectW;
+    rect.h = rectH;
+    rect.x = rectX;
+    rect.y = rectY;
+
+    int leftSideX = q_x + (rectW / 2) * -cos(q_theta);
+    int leftSideY = q_y + (rectW / 2) * -sin(q_theta);
+    int rightSideX = q_x + (rectW / 2) * cos(q_theta);
+    int rightSideY = q_y + (rectW / 2) * sin(q_theta);
+
+    int leftSideX2 = leftSideX + rectH * -cos(q_theta - 0.5 * M_PI);
+    int leftSideY2 = leftSideY + rectH * -sin(q_theta - 0.5 * M_PI);
+    int rightSideX2 = rightSideX + rectH * cos(q_theta + 0.5 * M_PI);
+    int rightSideY2 = rightSideY + rectH * sin(q_theta + 0.5 * M_PI);
 
     SDL_SetRenderDrawColor(gRenderer.get(), 0xFF, 0x00, 0x00, 0xFF);
     //filledCircleColor(gRenderer.get(), q_x, q_y, 30, 0xFFAA00FF);
 
     /* drawing drone */
-    SDL_RenderFillRect(gRenderer.get(), &rect);
-    drawEllipse(gRenderer.get(), rect.x - propWidth / 2, rect.y - rect.h, propWidth / 2, propHeight);
-    drawEllipse(gRenderer.get(), rect.x, rect.y - rect.h, propWidth / 2, propHeight);
-    drawEllipse(gRenderer.get(), rect.x + rect.w - propWidth/2, rect.y - rect.h, propWidth / 2, propHeight);
-    drawEllipse(gRenderer.get(), rect.x + rect.w, rect.y - rect.h, propWidth / 2, propHeight);
+    //drawRotatedRect(gRenderer.get(), rectX, rectY, rectW, rectH, q_theta);
+    //SDL_RenderFillRect(gRenderer.get(), &rect);
+    SDL_RenderDrawLine(gRenderer.get(), leftSideX, leftSideY, rightSideX, rightSideY);
+    SDL_RenderDrawLine(gRenderer.get(), leftSideX, leftSideY, leftSideX2, leftSideY2);
 
+    SDL_SetRenderDrawColor(gRenderer.get(), 0x11, 0x00, 0xFF, 0xFF);
+    SDL_RenderDrawLine(gRenderer.get(), rightSideX, rightSideY, rightSideX2, rightSideY2);
+    SDL_RenderDrawLine(gRenderer.get(), leftSideX2, leftSideY2, rightSideX2, rightSideY2);
+
+    SDL_SetRenderDrawColor(gRenderer.get(), 0xAA, 0x00, 0xAA, 0xFF);
+    drawFilledEllipse(gRenderer.get(), leftSideX, leftSideY - rectH, rectW / 4, rectH / 2);
+
+    SDL_SetRenderDrawColor(gRenderer.get(), 0xAA, 0x00, 0xAA, 0xFF);
+    drawFilledEllipse(gRenderer.get(), rightSideX, rightSideY - rectH, rectW / 4, rectH / 2);
     
 }
 
