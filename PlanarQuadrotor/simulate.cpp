@@ -3,6 +3,8 @@
 */
 #include "simulate.h"
 #include <matplot/matplot.h>
+#include <chrono>
+#include <Windows.h>
 
 Eigen::MatrixXf LQR(PlanarQuadrotor &quadrotor, float dt) {
     /* Calculate LQR gain matrix */
@@ -16,9 +18,9 @@ Eigen::MatrixXf LQR(PlanarQuadrotor &quadrotor, float dt) {
     Eigen::MatrixXf K = Eigen::MatrixXf::Zero(6, 6);
     Eigen::Vector2f input = quadrotor.GravityCompInput();
     
-    Q.diagonal() << 0.003, 0.003, 1500, 0.01, 0.01, 1;
-    R.row(0) << 50, 0;
-    R.row(1) << 0, 50;
+    Q.diagonal() << 0.005, 0.005, 800, 0.1, 0.05, 1;
+    R.row(0) << 15, 0;
+    R.row(1) << 0, 15;
 
     std::tie(A, B) = quadrotor.Linearize();
     A_discrete = Eye + dt * A;
@@ -31,6 +33,7 @@ void control(PlanarQuadrotor &quadrotor, const Eigen::MatrixXf &K) {
     Eigen::Vector2f input = quadrotor.GravityCompInput();
     quadrotor.SetInput(input - K * quadrotor.GetControlState());
 }
+
 
 int main(int argc, char* args[])
 {
@@ -69,6 +72,8 @@ int main(int argc, char* args[])
     std::vector<float> x_history;
     std::vector<float> y_history;
     std::vector<float> theta_history;
+    std::vector<float> speed_history;
+    std::vector<double> historyTime;
 
     if (init(gWindow, gRenderer, SCREEN_WIDTH, SCREEN_HEIGHT) >= 0)
     {
@@ -77,20 +82,59 @@ int main(int argc, char* args[])
         bool quit = false;
         float delay;
         int x, y, t;
+        int lastX = 0;
+        int lastY = 0;
+        double speed = 0;
+        double travel = 0;
         Eigen::VectorXf state = Eigen::VectorXf::Zero(6);
         Eigen::VectorXf stateHistory = Eigen::VectorXf::Zero(6);
         int time_stops = 1;
 
+        if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+            std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+            return -1;
+        }
+
+        // Initialize SDL_mixer
+        if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+            std::cerr << "SDL_mixer could not initialize! Mix_Error: " << Mix_GetError() << std::endl;
+            SDL_Quit();
+            return -1;
+        }
+
+        // Load the sound file
+        Mix_Chunk* sound = Mix_LoadWAV("note.wav");
+        if (sound == nullptr) {
+            std::cerr << "Failed to load sound! Mix_Error: " << Mix_GetError() << std::endl;
+            Mix_CloseAudio();
+            SDL_Quit();
+            return -1;
+        }
+
         while (!quit)
         {
+
             stateHistory = quadrotor.GetState();
             
             if (difftime(time(0), start_time) >= time_stops) {
+                // measure drone speed
+                travel = sqrt(pow((stateHistory[1] - lastY), 2) + pow((stateHistory[0] - lastX), 2));
+                speed = travel;
+                lastX = stateHistory[0];
+                lastY = stateHistory[1];
+                std::cout << "Actual Drone Speed: " << (int)speed << " pps" << std::endl;
+
+                // 
                 x_history.push_back(stateHistory[0]);
                 y_history.push_back(stateHistory[1]);
                 theta_history.push_back(stateHistory[2]*180/M_PI);
+                speed_history.push_back(speed);
+                historyTime.push_back(time_stops-1);
                 time_stops += 1;
+
+                /*PLAY SOUND*/
             }
+            
 
             //events
             while (SDL_PollEvent(&e) != 0)
@@ -99,11 +143,11 @@ int main(int argc, char* args[])
                 {
                     quit = true;
                 }
-                else if (e.type == SDL_MOUSEMOTION)
+                /*else if (e.type == SDL_MOUSEMOTION)
                 {
                     SDL_GetMouseState(&x, &y);
                     std::cout << "Mouse position: (" << x << ", " << y << ")" << std::endl;
-                }
+                }*/
                 else if (e.type == SDL_MOUSEBUTTONDOWN)
                 {
                     SDL_GetMouseState(&x, &y);
@@ -112,9 +156,9 @@ int main(int argc, char* args[])
                 }
                 else if (e.type == SDL_KEYUP) {
                     if (e.key.keysym.sym == SDLK_p) {
-                        std::vector<double> historyTime = matplot::linspace(0, time_stops);
+                        
 
-                        matplot::tiledlayout(3, 1);
+                        matplot::tiledlayout(2, 2);
                         auto ax1 = matplot::nexttile();
                         auto p1 = matplot::plot(ax1, historyTime, x_history, "-o");
                         matplot::xlabel(ax1, "time");
@@ -129,6 +173,11 @@ int main(int argc, char* args[])
                         auto p3 = matplot::plot(ax3, historyTime, theta_history, "-:gr");
                         matplot::xlabel(ax3, "time");
                         matplot::ylabel(ax3, "theta");
+
+                        auto ax4 = matplot::nexttile();
+                        auto p4 = matplot::plot(ax4, historyTime, speed_history, "-*");
+                        matplot::xlabel(ax4, "time");
+                        matplot::ylabel(ax4, "speed");
 
                         matplot::show();
                     }
