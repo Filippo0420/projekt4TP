@@ -15,10 +15,10 @@ Eigen::MatrixXf LQR(PlanarQuadrotor &quadrotor, float dt) {
     Eigen::MatrixXf R = Eigen::MatrixXf::Identity(2, 2);
     Eigen::MatrixXf K = Eigen::MatrixXf::Zero(6, 6);
     Eigen::Vector2f input = quadrotor.GravityCompInput();
-
-    Q.diagonal() << 10, 10, 10, 1, 10, 0.25 / 2 / M_PI;
-    R.row(0) << 0.1, 0.05;
-    R.row(1) << 0.05, 0.1;
+    
+    Q.diagonal() << 0.003, 0.003, 1500, 0.01, 0.01, 1;
+    R.row(0) << 50, 0;
+    R.row(1) << 0, 50;
 
     std::tie(A, B) = quadrotor.Linearize();
     A_discrete = Eye + dt * A;
@@ -88,7 +88,7 @@ int main(int argc, char* args[])
             if (difftime(time(0), start_time) >= time_stops) {
                 x_history.push_back(stateHistory[0]);
                 y_history.push_back(stateHistory[1]);
-                theta_history.push_back(stateHistory[2]);
+                theta_history.push_back(stateHistory[2]*180/M_PI);
                 time_stops += 1;
             }
 
