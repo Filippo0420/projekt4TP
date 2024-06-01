@@ -3,8 +3,6 @@
 */
 #include "simulate.h"
 #include <matplot/matplot.h>
-#include <chrono>
-#include <Windows.h>
 
 Eigen::MatrixXf LQR(PlanarQuadrotor &quadrotor, float dt) {
     /* Calculate LQR gain matrix */
@@ -89,27 +87,6 @@ int main(int argc, char* args[])
         Eigen::VectorXf state = Eigen::VectorXf::Zero(6);
         Eigen::VectorXf stateHistory = Eigen::VectorXf::Zero(6);
         int time_stops = 1;
-
-        if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-            std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
-            return -1;
-        }
-
-        // Initialize SDL_mixer
-        if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-            std::cerr << "SDL_mixer could not initialize! Mix_Error: " << Mix_GetError() << std::endl;
-            SDL_Quit();
-            return -1;
-        }
-
-        // Load the sound file
-        Mix_Chunk* sound = Mix_LoadWAV("note.wav");
-        if (sound == nullptr) {
-            std::cerr << "Failed to load sound! Mix_Error: " << Mix_GetError() << std::endl;
-            Mix_CloseAudio();
-            SDL_Quit();
-            return -1;
-        }
 
         while (!quit)
         {
