@@ -8,3 +8,6 @@
 [submodule "SDL2_gfx"]
 	path = SDL2_gfx
 	url = https://github.com/mupfdev/SDL2_gfx
+[submodule "VSSynth"]
+	path = VSSynth
+	url = https://github.com/airloaf/VSSynth.git
