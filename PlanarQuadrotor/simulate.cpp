@@ -2,7 +2,7 @@
  * SDL window creation adapted from https://github.com/isJuhn/DoublePendulum
 */
 #include "simulate.h"
-#include <matplot/matplot.h>
+
 
 Eigen::MatrixXf LQR(PlanarQuadrotor &quadrotor, float dt) {
     /* Calculate LQR gain matrix */
@@ -87,6 +87,18 @@ int main(int argc, char* args[])
         Eigen::VectorXf state = Eigen::VectorXf::Zero(6);
         Eigen::VectorXf stateHistory = Eigen::VectorXf::Zero(6);
         int time_stops = 1;
+
+        VSSynth::Generators::Tone tone(
+            [](double frequency, double time) {
+                return VSSynth::Waveforms::sine(frequency, time);
+            });
+        tone.playNote(VSSynth::Notes::C4);
+
+        VSSynth::Synthesizer synth;
+
+        synth.open();
+        synth.addSoundGenerator(&tone);
+        synth.unpause();
 
         while (!quit)
         {
@@ -176,6 +188,8 @@ int main(int argc, char* args[])
             control(quadrotor, K);
             quadrotor.Update(dt);
         }
+        synth.pause();
+        synth.close();
     }
     SDL_Quit();
     return 0;
@@ -183,7 +197,7 @@ int main(int argc, char* args[])
 
 int init(std::shared_ptr<SDL_Window>& gWindow, std::shared_ptr<SDL_Renderer>& gRenderer, const int SCREEN_WIDTH, const int SCREEN_HEIGHT)
 {
-    if (SDL_Init(SDL_INIT_VIDEO) >= 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) >= 0)
     {
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
         gWindow = std::shared_ptr<SDL_Window>(SDL_CreateWindow("Planar Quadrotor", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN), SDL_DestroyWindow);

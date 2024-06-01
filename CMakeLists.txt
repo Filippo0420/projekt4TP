@@ -7,6 +7,7 @@ include(cmake/CPM.cmake)
 add_subdirectory(matplotplusplus)
 add_subdirectory(SDL)
 add_subdirectory(SDL2_gfx)
+add_subdirectory(VSSynth)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}")
 
@@ -29,7 +30,7 @@ if(TARGET SDL2::SDL2main)
     # It has an implicit dependency on SDL2 functions, so it MUST be added before SDL2::SDL2 (or SDL2::SDL2-static)
     target_link_libraries(planar_quadrotor SDL2::SDL2main)
 endif()
-target_link_libraries(planar_quadrotor SDL2::SDL2 SDL2_gfx Eigen matplot)
+target_link_libraries(planar_quadrotor SDL2::SDL2 SDL2_gfx Eigen matplot VSSynth)
 target_include_directories(planar_quadrotor PRIVATE ${PROJECT_SOURCE_DIR})
 
 if (WIN32)
