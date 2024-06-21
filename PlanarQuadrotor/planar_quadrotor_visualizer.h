@@ -12,5 +12,5 @@ private:
     PlanarQuadrotor *quadrotor_ptr;
 public:
     PlanarQuadrotorVisualizer(PlanarQuadrotor *quadrotor_ptr);
-    void render(std::shared_ptr<SDL_Renderer> &gRenderer);
+    void render(std::shared_ptr<SDL_Renderer> &gRenderer, int propAngle);
 };

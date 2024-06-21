@@ -1,4 +1,6 @@
-#include "planar_quadrotor_visualizer.h"
+﻿#include "planar_quadrotor_visualizer.h"
+#include <tuple>
+#include <chrono>
 
 PlanarQuadrotorVisualizer::PlanarQuadrotorVisualizer(PlanarQuadrotor *quadrotor_ptr): quadrotor_ptr(quadrotor_ptr) {}
 
@@ -19,37 +21,40 @@ void drawFilledEllipse(SDL_Renderer* renderer, int centerX, int centerY, int rad
     }
 }
 
-// Function to draw and fill a rotated rectangle with an additional shape (ellipse) inside
-void drawRotatedRect(SDL_Renderer* renderer, int x, int y, int w, int h, double angle) {
-    // Create a texture to represent the rectangle
-    SDL_Texture* rectTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
 
-    // Set the texture as the rendering target
-    SDL_SetRenderTarget(renderer, rectTexture);
+void drawEmptyElipse(SDL_Renderer* renderer, int x1, int y1, int x2, int y2, double b) {
+    double h = (x1 + x2) / 2.0;
+    double k = (y1 + y2) / 2.0;
 
-    // Fill the texture with red color for the rectangle
-    SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
-    SDL_Rect fillRect = { 0, 0, w, h };
-    SDL_RenderFillRect(renderer, &fillRect);
+    double a = std::sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)) / 2.0;
 
-    // Draw a filled blue ellipse inside the rectangle
-    SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0xFF, 0xFF);
-    drawFilledEllipse(renderer, x - w/2, y - h/2, w/4, h/4);
+    double theta = std::atan2(y2 - y1, x2 - x1);
 
-    // Reset the rendering target to the default
-    SDL_SetRenderTarget(renderer, NULL);
+    // Step through the angle t from 0 to 2π
+    for (double t = 0; t <= 2 * M_PI; t += 0.01) {
+        double x_prime = a * std::cos(t);
+        double y_prime = b * std::sin(t);
 
-    // Define the destination rectangle on the screen
-    SDL_Rect destRect = { x, y, w, h};
+        double x = h + x_prime * std::cos(theta) - y_prime * std::sin(theta);
+        double y = k + x_prime * std::sin(theta) + y_prime * std::cos(theta);
 
-    // Copy the texture to the renderer with rotation
-    SDL_RenderCopyEx(renderer, rectTexture, NULL, &destRect, angle, NULL, SDL_FLIP_NONE);
-
-    // Destroy the texture
-    SDL_DestroyTexture(rectTexture);
+        SDL_RenderDrawPoint(renderer, static_cast<int>(std::round(x)), static_cast<int>(std::round(y)));
+    }
 }
 
-void PlanarQuadrotorVisualizer::render(std::shared_ptr<SDL_Renderer> &gRenderer) {
+
+std::tuple<int, int> getElipsePoint(int x1, int y1, double theta, double fi, int a, int b) {
+    
+    double x_prime = a * std::cos(fi);
+    double y_prime = b * std::sin(fi);
+
+    double x = x1 + x_prime * std::cos(theta) - y_prime * std::sin(theta);
+    double y = y1 + x_prime * std::sin(theta) + y_prime * std::cos(theta);
+    return { static_cast<int>(std::round(x)), static_cast<int>(std::round(y)) };
+}
+
+
+void PlanarQuadrotorVisualizer::render(std::shared_ptr<SDL_Renderer> &gRenderer, int propAngle) {
     Eigen::VectorXf state = quadrotor_ptr->GetState();
     float q_x, q_y, q_theta;
     const int screenX = 1280;
@@ -59,17 +64,17 @@ void PlanarQuadrotorVisualizer::render(std::shared_ptr<SDL_Renderer> &gRenderer)
     q_y = state[1] + screenY/2;
     q_theta = state[2];
 
-    SDL_Rect rect;
+
+    int propWidth = 40;
+    int propHeight = 8;
+    int propElipseWidth = 70;
+    int propElipseHeight = 16;
 
     int rectW = 50;
     int rectH = 10;
     int rectX = q_x - rectW/2;
     int rectY = q_y - rectH/2;
 
-    rect.w = rectW;
-    rect.h = rectH;
-    rect.x = rectX;
-    rect.y = rectY;
 
     int leftSideX = q_x + (rectW / 2) * -cos(q_theta);
     int leftSideY = q_y + (rectW / 2) * -sin(q_theta);
@@ -81,12 +86,13 @@ void PlanarQuadrotorVisualizer::render(std::shared_ptr<SDL_Renderer> &gRenderer)
     int rightSideX2 = rightSideX + rectH * cos(q_theta + 0.5 * M_PI);
     int rightSideY2 = rightSideY + rectH * sin(q_theta + 0.5 * M_PI);
 
-    SDL_SetRenderDrawColor(gRenderer.get(), 0xFF, 0x00, 0x00, 0xFF);
-    //filledCircleColor(gRenderer.get(), q_x, q_y, 30, 0xFFAA00FF);
+    int leftPropCentreX = leftSideX2 - 2*rectH * cos(q_theta + 0.5 * M_PI);
+    int leftPropCentreY = leftSideY2 - 2*rectH * sin(q_theta + 0.5 * M_PI);
 
-    /* drawing drone */
-    //drawRotatedRect(gRenderer.get(), rectX, rectY, rectW, rectH, q_theta);
-    //SDL_RenderFillRect(gRenderer.get(), &rect);
+    int rightPropCentreX = rightSideX2 - 2 * rectH * cos(q_theta + 0.5 * M_PI);
+    int rightPropCentreY = rightSideY2 - 2 * rectH * sin(q_theta + 0.5 * M_PI);
+
+    SDL_SetRenderDrawColor(gRenderer.get(), 0xFF, 0x00, 0x00, 0xFF);
     SDL_RenderDrawLine(gRenderer.get(), leftSideX, leftSideY, rightSideX, rightSideY);
     SDL_RenderDrawLine(gRenderer.get(), leftSideX, leftSideY, leftSideX2, leftSideY2);
 
@@ -94,11 +100,26 @@ void PlanarQuadrotorVisualizer::render(std::shared_ptr<SDL_Renderer> &gRenderer)
     SDL_RenderDrawLine(gRenderer.get(), rightSideX, rightSideY, rightSideX2, rightSideY2);
     SDL_RenderDrawLine(gRenderer.get(), leftSideX2, leftSideY2, rightSideX2, rightSideY2);
 
-    SDL_SetRenderDrawColor(gRenderer.get(), 0xAA, 0x00, 0xAA, 0xFF);
-    drawFilledEllipse(gRenderer.get(), leftSideX, leftSideY - rectH, rectW / 4, rectH / 2);
-
-    SDL_SetRenderDrawColor(gRenderer.get(), 0xAA, 0x00, 0xAA, 0xFF);
-    drawFilledEllipse(gRenderer.get(), rightSideX, rightSideY - rectH, rectW / 4, rectH / 2);
+    SDL_SetRenderDrawColor(gRenderer.get(), 0x00, 0x00, 0x00, 0xFF);
+    SDL_RenderDrawLine(gRenderer.get(), leftSideX2, leftSideY2, leftPropCentreX, leftPropCentreY);
+    SDL_RenderDrawLine(gRenderer.get(), rightSideX2, rightSideY2, rightPropCentreX, rightPropCentreY);
     
+
+    SDL_SetRenderDrawColor(gRenderer.get(), 0x11, 0xAA, 0xAA, 0xFF);
+    std::tuple<int, int> actualProp1LeftEnd = getElipsePoint(leftPropCentreX, leftPropCentreY, q_theta, M_PI * cos(propAngle * (M_PI / 180)), propElipseWidth / 2, propElipseHeight / 2);
+    drawEmptyElipse(gRenderer.get(), leftPropCentreX, leftPropCentreY, std::get<0>(actualProp1LeftEnd), std::get<1>(actualProp1LeftEnd), propHeight / 2);
+
+    std::tuple<int, int> actualProp1RightEnd = getElipsePoint(leftPropCentreX, leftPropCentreY, q_theta, M_PI + M_PI * cos(propAngle * (M_PI / 180)), propElipseWidth / 2, propElipseHeight / 2);
+    drawEmptyElipse(gRenderer.get(), leftPropCentreX, leftPropCentreY, std::get<0>(actualProp1RightEnd), std::get<1>(actualProp1RightEnd), propHeight / 2);
+
+
+
+
+    SDL_SetRenderDrawColor(gRenderer.get(), 0xFA, 0xA0, 0xA0, 0xFF);
+    std::tuple<int, int> actualProp2LeftEnd = getElipsePoint(rightPropCentreX, rightPropCentreY, q_theta, M_PI * cos(propAngle * (M_PI / 180)), propElipseWidth / 2, propElipseHeight / 2);
+    drawEmptyElipse(gRenderer.get(), rightPropCentreX, rightPropCentreY, std::get<0>(actualProp2LeftEnd), std::get<1>(actualProp2LeftEnd), propHeight / 2);
+
+    std::tuple<int, int> actualProp2RightEnd = getElipsePoint(rightPropCentreX, rightPropCentreY, q_theta, M_PI + M_PI * cos(propAngle * (M_PI / 180)), propElipseWidth / 2, propElipseHeight / 2);
+    drawEmptyElipse(gRenderer.get(), rightPropCentreX, rightPropCentreY, std::get<0>(actualProp2RightEnd), std::get<1>(actualProp2RightEnd), propHeight / 2);
 }
 

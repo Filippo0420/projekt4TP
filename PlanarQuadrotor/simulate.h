@@ -6,7 +6,6 @@
 #include <SDL.h>
 #include <SDL2_gfx/SDL2_gfxPrimitives.h>
 #include <matplot/matplot.h>
-#include <VSSynth/VSSynth.h>
 
 #include "planar_quadrotor.h"
 #include "planar_quadrotor_visualizer.h"
